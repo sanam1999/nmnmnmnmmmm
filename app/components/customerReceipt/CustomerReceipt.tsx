@@ -407,7 +407,7 @@ export const CustomerReceipt = () => {
                   "c) Foreign tourists (directly or through tour guides)",
               },
               {
-                key: "d) Unutilized foreign currency obtained for travel purpose by residents",
+                key: "Unutilized foreign currency obtained for travel purpose by residents",
                 label:
                   "d) Unutilized foreign currency obtained for travel purpose by residents",
               },
@@ -430,8 +430,7 @@ export const CustomerReceipt = () => {
                       className="h-7 w-40 text-sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!sources.includes("other"))
-                          toggleSource("other");
+                        if (!sources.includes("Other")) toggleSource("Other");
                       }}
                     />
                     <span className="text-xs text-gray-500">
