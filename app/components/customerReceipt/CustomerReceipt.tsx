@@ -204,7 +204,7 @@ export const CustomerReceipt = () => {
     }
 
     try {
-      const saveRes = await fetch("/api/customer-receipt", {
+      const saveRes = await fetch("https://pearlcitypos.com/api/customer-receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
