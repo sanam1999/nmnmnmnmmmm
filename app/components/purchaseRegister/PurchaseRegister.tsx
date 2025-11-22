@@ -207,7 +207,7 @@ export const PurchaseRegister = () => {
                   filteredPurchases.map((purchase) =>
                     purchase.currencies.map((currency, index) => (
                       <TableRow
-                        key={`${purchase.id}-${currency.currencyType}`}
+                        key={`${index}-${currency.currencyType}`}
                         className="hover:bg-muted/30"
                       >
                         {index === 0 && (
