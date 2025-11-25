@@ -20,9 +20,8 @@ export interface PDFData {
   rows: CurrencyRow[];
 }
 
-
 // ================================
-// PDF Generation Function (Final)
+// PDF Generation Function (A5 Size)
 // ================================
 export const generatePDF = (
   {
@@ -47,94 +46,97 @@ export const generatePDF = (
     return;
   }
 
-  const doc = new jsPDF("p", "mm", "a4");
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 15;
+  // Change to A5 size (148 x 210 mm) - portrait orientation
+  const doc = new jsPDF("p", "mm", "a5");
+  const pageWidth = doc.internal.pageSize.getWidth(); // 148 mm for A5
+  const pageHeight = doc.internal.pageSize.getHeight(); // 210 mm for A5
+  const margin = 10; // Reduced margin for smaller paper
   const bodyWidth = pageWidth - 2 * margin;
 
-  // Set initial Y lower to leave space for header block
-  let currentY = 55;
-  const boxHeight = 7;
+  // Set initial Y position
+  let currentY = 45; // Adjusted for smaller paper
+  const boxHeight = 6; // Slightly smaller boxes
 
   const logoImg = new Image();
   logoImg.src = "/logo.png";
 
-  // --- Logo Placement ---
-  doc.addImage(logoImg, "PNG", 15, 5, 40, 40);
+  // --- Logo Placement (smaller) ---
+  doc.addImage(logoImg, "PNG", margin, 5, 30, 30); // Smaller logo
 
-  // --- Header Section ---
-  let headerY = 15;
+  // --- Header Section (adjusted font sizes) ---
+  let headerY = 12;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(12); // Reduced from 14
   doc.text("PEARL CITY HOTEL (PVT) LTD", pageWidth / 2, headerY, {
     align: "center",
   });
-  headerY += 6;
+  headerY += 5;
 
-  doc.setFontSize(12);
+  doc.setFontSize(10); // Reduced from 12
   doc.text("AUTHORIZED FOREIGN MONEY CHANGER", pageWidth / 2, headerY, {
     align: "center",
   });
-  headerY += 6;
+  headerY += 5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8); // Reduced from 10
   doc.text("17, Bauddhaloka Mawatha, Colombo - 04", pageWidth / 2, headerY, {
     align: "center",
   });
-  headerY += 5;
+  headerY += 4;
   doc.text("Tel 011 4523800 (Auto Lines)", pageWidth / 2, headerY, {
     align: "center",
   });
-  headerY += 5;
-  doc.text(
-    "E-mail : moneyexchange@pearlgrouphotels.com - Website : pearlgrouphotels.com",
-    pageWidth / 2,
-    headerY,
-    { align: "center" }
-  );
+  headerY += 4;
+  
+  // Split long text into two lines
+  const emailText = "E-mail : moneyexchange@pearlgrouphotels.com";
+  const websiteText = "Website : pearlgrouphotels.com";
+  doc.text(emailText, pageWidth / 2, headerY, { align: "center" });
+  headerY += 4;
+  doc.text(websiteText, pageWidth / 2, headerY, { align: "center" });
 
   // --- Permit, Serial, Date ---
-  const lineY = currentY - 5;
-  const boxWidth = 40;
+  const lineY = currentY - 4;
+  const boxWidth = 35; // Smaller boxes
   const boxX = pageWidth - margin - boxWidth;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(9); // Slightly smaller font
 
   // Permit No.
   doc.text("Permit No. :", margin, currentY);
   const permitNoText = "DFE/RD/6000";
-  doc.text(permitNoText, margin + 25, currentY);
-  doc.line(margin + 24.5, currentY + 0.5, margin + 60, currentY + 0.5);
+  doc.text(permitNoText, margin + 22, currentY);
+  doc.line(margin + 21.5, currentY + 0.5, margin + 50, currentY + 0.5);
 
   // Serial No.
-  doc.text("Serial No", boxX - 25, currentY);
+  doc.text("Serial No", boxX - 20, currentY);
   doc.rect(boxX, lineY, boxWidth, boxHeight);
   doc.setFont("helvetica", "normal");
   doc.text(serialNo || "", boxX + 2, currentY - 1);
 
-  currentY += 8;
+  currentY += 7;
 
   // Date
   doc.setFont("helvetica", "bold");
-  doc.text("Date", boxX - 25, currentY);
-  doc.rect(boxX, lineY + 8, boxWidth, boxHeight);
+  doc.text("Date", boxX - 20, currentY);
+  doc.rect(boxX, lineY + 7, boxWidth, boxHeight);
   doc.setFont("helvetica", "normal");
   doc.text(date, boxX + 2, currentY - 1);
 
-  currentY += 8;
+  currentY += 7;
 
   // --- Customer Info ---
   const labelX = margin;
-  const infoBoxX = margin + 55;
+  const infoBoxX = margin + 45; // Adjusted for smaller paper
   const infoBoxWidth = pageWidth - infoBoxX - margin;
-  const lineHeight = 10;
+  const lineHeight = 8; // Reduced line height
 
   // Name
   doc.setFont("helvetica", "bold");
   doc.text("NAME OF THE CUSTOMER", labelX, currentY);
-  doc.rect(infoBoxX, currentY - 5, infoBoxWidth, boxHeight);
+  doc.rect(infoBoxX, currentY - 4, infoBoxWidth, boxHeight);
   doc.setFont("helvetica", "normal");
   doc.text(customerName, infoBoxX + 2, currentY - 1);
   currentY += lineHeight;
@@ -142,7 +144,7 @@ export const generatePDF = (
   // NIC/Passport
   doc.setFont("helvetica", "bold");
   doc.text("NIC/PASSPORT NO", labelX, currentY);
-  doc.rect(infoBoxX, currentY - 5, infoBoxWidth, boxHeight);
+  doc.rect(infoBoxX, currentY - 4, infoBoxWidth, boxHeight);
   doc.setFont("helvetica", "normal");
   doc.text(nicPassport, infoBoxX + 2, currentY - 1);
   currentY += lineHeight;
@@ -151,52 +153,51 @@ export const generatePDF = (
   currentY += 3;
   doc.setFont("helvetica", "bold");
   doc.text("Source of Foreign Currency", labelX, currentY);
-  currentY += 5;
+  currentY += 4;
 
   const sourcesText = [
-    { key: "Persons return for vacation from foreign employment", label: "a) Persons return for vacation from foreign employment" },
-    { key: "Relatives of those employees abroadives", label: "b) Relatives of those employees abroad" },
-    { key: "Foreign tourists (directly or through tour guides)", label: "c) Foreign tourists (directly or through tour guides)" },
-    { key: "Unutilized foreign currency obtained for travel purpose by residents", label: "d) Unutilized foreign currency obtained for travel purpose by residents" },
+    { key: "Persons return for vacation from foreign employment", label: "a) Foreign employment returnees" },
+    { key: "Relatives of those employees abroadives", label: "b) Relatives abroad" },
+    { key: "Foreign tourists (directly or through tour guides)", label: "c) Foreign tourists" },
+    { key: "Unutilized foreign currency obtained for travel purpose by residents", label: "d) Unutilized travel currency" },
     { key: "Other", label: "e) Other" },
   ];
 
-  const checkboxX = pageWidth - margin - 8;
-  const checkboxSize = 5;
-  const otherBoxWidth = 50;
+  const checkboxX = pageWidth - margin - 6;
+  const checkboxSize = 4;
+  const otherBoxWidth = 40;
 
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(8); // Smaller font for options
   sourcesText.forEach((src) => {
     const isChecked = sources.includes(src.key);
     doc.text(src.label, labelX, currentY);
 
-    doc.rect(checkboxX, currentY - 4, checkboxSize, checkboxSize);
+    doc.rect(checkboxX, currentY - 3, checkboxSize, checkboxSize);
 
     if (isChecked) {
-      doc.setFontSize(10);
-      doc.text("X", checkboxX + checkboxSize / 2, currentY - 1, {
+      doc.setFontSize(8);
+      doc.text("X", checkboxX + checkboxSize / 2, currentY - 0.5, {
         align: "center",
       });
-      doc.setFontSize(10);
     }
 
     if (src.key === "Other") {
-      doc.rect(labelX + 15, currentY - 4, otherBoxWidth, checkboxSize);
-      doc.text(otherSource, labelX + 17, currentY - 1);
+      doc.rect(labelX + 12, currentY - 3, otherBoxWidth, checkboxSize);
+      doc.text(otherSource, labelX + 14, currentY - 0.5);
 
-      doc.setFontSize(8);
+      doc.setFontSize(6);
       doc.text(
         "If other specify",
-        labelX + 15 + otherBoxWidth + 2,
-        currentY - 0.5
+        labelX + 12 + otherBoxWidth + 2,
+        currentY - 0.2
       );
-      doc.setFontSize(10);
     }
 
-    currentY += 6;
+    currentY += 5;
   });
 
-  currentY += 5;
+  currentY += 4;
 
   // --- Helper: Number Formatter ---
   const formatAmount = (val: string | number | undefined): string => {
@@ -211,7 +212,7 @@ export const generatePDF = (
 
   // --- Currency Table ---
   const tableHeaders = [
-    ["Currency Type", "Amount Received in (FCY)", "Rate Offered", "Amount Issued"],
+    ["Currency Type", "Amount Received", "Rate", "Amount Issued"],
   ];
 
   const tableData = rows.map((r) => [
@@ -232,8 +233,8 @@ export const generatePDF = (
     theme: "grid",
     margin: { left: margin, right: margin },
     styles: {
-      fontSize: 10,
-      cellPadding: 2,
+      fontSize: 8, // Smaller font for table
+      cellPadding: 1.5, // Less padding
       lineWidth: 0.1,
       lineColor: [0, 0, 0],
     },
@@ -255,14 +256,14 @@ export const generatePDF = (
   });
 
   const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || currentY;
-  currentY = finalY + 30;
+  currentY = finalY + 20;
 
   // --- Signature Sections ---
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8);
   const signatureLineY = currentY - 2;
-  const signatureLineLength = bodyWidth * 0.45;
-  const signatureGap = 5;
+  const signatureLineLength = bodyWidth * 0.4;
+  const signatureGap = 4;
 
   // Customer Signature
   const customerSigX = margin;
@@ -273,7 +274,7 @@ export const generatePDF = (
     signatureLineY
   );
   doc.text(
-    "Signature of the customer",
+    "Customer Signature",
     customerSigX + 5,
     signatureLineY + signatureGap
   );
@@ -287,8 +288,8 @@ export const generatePDF = (
     signatureLineY
   );
   doc.text(
-    "Signature & the stamp of the money changer",
-    changerSigX + 5,
+    "Money Changer Signature & Stamp",
+    changerSigX + 2,
     signatureLineY + signatureGap
   );
 
