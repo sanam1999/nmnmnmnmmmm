@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-
+import { useSearchParams,useRouter } from "next/navigation";
+import { toast } from "../hooks/use-toast";
+ 
 export default function ResetPasswordComponent() {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -34,6 +36,8 @@ export default function ResetPasswordComponent() {
 
     setIsLoading(true);
     setMessage("");
+   
+
 
     try {
       const res = await fetch("/api/password/reset", {
@@ -48,9 +52,18 @@ export default function ResetPasswordComponent() {
         throw new Error(data.message || "Something went wrong");
       }
 
-      setMessage(
-        "Password reset successfully! You can now login with your new password."
-      );
+    
+
+        toast({
+        title: "Success",
+        description: "Password reset successfully...",
+      });
+
+      
+      setTimeout(() => {
+        router.push("https://pearlcitypos.com/login");
+      }, 100);
+
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
@@ -103,8 +116,7 @@ export default function ResetPasswordComponent() {
         >
           {isLoading ? "Resetting..." : "Reset Password"}
         </button>
-
-        {message && (
+	{message && (
           <p
             className={`mt-3 ${
               message.includes("successfully") ? "text-green-600" : "text-red-600"
@@ -117,3 +129,4 @@ export default function ResetPasswordComponent() {
     </div>
   );
 }
+
