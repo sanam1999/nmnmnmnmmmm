@@ -18,6 +18,21 @@ export async function POST(req: NextRequest) {
 
     const day = toDayDate(date);
 
+    const existingRow = await prisma.dailyCurrencyBalance.findUnique({
+  where: { currencyType_date: { currencyType, date: day } },
+});
+
+if (existingRow) {
+  const currentClosing = Number(existingRow.closingBalance ?? 0);
+
+  if (depositAmount > currentClosing) {
+    return NextResponse.json(
+      { error: "Deposit amount cannot exceed today's closing balance." },
+      { status: 400 }
+    );
+  }
+}
+
     // 1) Insert audit record
     await prisma.depositRecord.create({
       data: {
