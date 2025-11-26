@@ -171,7 +171,7 @@ export default function BalanceStatement() {
 
       if (!res.ok) {
         toast({
-        title: "Deposit Error",
+        title: "Error",
         description: data.error || "Something went wrong",
         variant: "destructive",
       });
