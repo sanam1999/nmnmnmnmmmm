@@ -26,6 +26,7 @@ import { generatePDF, PDFData } from "./pdfGenerator";
 import { blacklistedCustomers } from "../../libs/blacklist";
 import Link from "next/link";
 import { toDayDate } from "../../libs/day";
+import { ConfirmationModal } from "../ui/ConfirmModal"; 
 
 // Helper to get Sri Lanka date string YYYY-MM-DD
 const getSriLankaDateString = (date: Date = new Date()) => {
@@ -62,6 +63,33 @@ interface ReceiptCurrency {
   amountIssuedLkr: number;
 }
 
+// Defined outside component to use for both rendering checkboxes and mapping for modal
+const SOURCE_OPTIONS = [
+  {
+    key: "Persons return for vacation from foreign employment",
+    label: "a) Persons return for vacation from foreign employment",
+  },
+  {
+    key: "Relatives of those employees abroad",
+    label: "b) Relatives of those employees abroad",
+  },
+  {
+    key: "Foreign tourists (Directly or through tour guides)",
+    label: "c) Foreign tourists (Directly or through tour guides)",
+  },
+  {
+    key: "Unutilized foreign currency obtained for travel purpose by residents",
+    label: "d) Unutilized foreign currency obtained for travel purpose by residents",
+  },
+  { key: "Other", label: "e) Other" },
+] as const;
+
+//lookup map for the modal { "key": "label" }
+const SOURCE_LABELS_MAP = SOURCE_OPTIONS.reduce((acc, item) => {
+  acc[item.key] = item.label;
+  return acc;
+}, {} as Record<string, string>);
+
 export const CustomerReceipt = () => {
   const [serialNo, setSerialNo] = useState("");
   const [date, setDate] = useState(getSriLankaDateString());
@@ -80,6 +108,10 @@ export const CustomerReceipt = () => {
   ]);
 
   const [recentPDFs, setRecentPDFs] = useState<SavedPDF[]>([]);
+  
+  // MODAL STATES
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Function to fetch recent PDFs
   const fetchRecentPDFs = async () => {
@@ -168,7 +200,9 @@ export const CustomerReceipt = () => {
     }
   };
 
-  const handleSaveAndDownload = async () => {
+  // 1. Initial Click Handler: Validation & Open Modal
+  const handleInitiateSave = () => {
+    // Basic Validation
     if (!customerName || !nicPassport || sources.length === 0) {
       toast({
         title: "Missing Information",
@@ -203,6 +237,13 @@ export const CustomerReceipt = () => {
       return;
     }
 
+    // If validation passes, open the modal
+    setIsModalOpen(true);
+  };
+
+  // 2. Final Logic: Actual Save & Download (Called by Modal onConfirm)
+  const handleFinalProcess = async () => {
+    setIsProcessing(true);
     try {
       const saveRes = await fetch(`api/customer-receipt`, {
         method: "POST",
@@ -268,6 +309,7 @@ export const CustomerReceipt = () => {
         fetchRecentPDFs();
       }
 
+      // Reset Form
       setSerialNo("");
       setCustomerName("");
       setNicPassport("");
@@ -282,6 +324,10 @@ export const CustomerReceipt = () => {
           amountIssued: "",
         },
       ]);
+      
+      // Close Modal on success
+      setIsModalOpen(false);
+      
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -294,6 +340,8 @@ export const CustomerReceipt = () => {
         description: `Failed to process receipt: ${message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -321,317 +369,314 @@ export const CustomerReceipt = () => {
   };
 
   return (
-    <Card className="shadow-[var(--shadow-medium)]">
-      <CardHeader className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground">
-        <CardTitle className="text-2xl">Customer Receipt</CardTitle>
-        <p className="text-sm opacity-90">
-          Foreign Currency Sale Transaction
-        </p>
-      </CardHeader>
+    <>
+      <Card className="shadow-[var(--shadow-medium)]">
+        <CardHeader className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground">
+          <CardTitle className="text-2xl">Customer Receipt</CardTitle>
+          <p className="text-sm opacity-90">
+            Foreign Currency Sale Transaction
+          </p>
+        </CardHeader>
 
-      <CardContent className="pt-6 space-y-6">
-        {/* Basic Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="permitNo">Permit No: DFE/RD/6000</Label>
-            <Input
-              id="permitNo"
-              value="DFE/RD/6000"
-              disabled
-              className="bg-muted"
-            />
+        <CardContent className="pt-6 space-y-6">
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="permitNo">Permit No: DFE/RD/6000</Label>
+              <Input
+                id="permitNo"
+                value="DFE/RD/6000"
+                disabled
+                className="bg-muted"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="serialNo">Serial No</Label>
+              <Input
+                id="serialNo"
+                value={serialNo}
+                readOnly
+                onChange={(e) => setSerialNo(e.target.value)}
+                placeholder="Enter serial number"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customerName">Name of the Customer *</Label>
+              <Input
+                id="customerName"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Enter customer name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nicPassport">NIC/Passport No *</Label>
+              <Input
+                id="nicPassport"
+                value={nicPassport}
+                onChange={(e) => setNicPassport(e.target.value)}
+                placeholder="Enter NIC or Passport number"
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="serialNo">Serial No</Label>
-            <Input
-              id="serialNo"
-              value={serialNo}
-              readOnly
-              onChange={(e) => setSerialNo(e.target.value)}
-              placeholder="Enter serial number"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="customerName">Name of the Customer *</Label>
-            <Input
-              id="customerName"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Enter customer name"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="nicPassport">NIC/Passport No *</Label>
-            <Input
-              id="nicPassport"
-              value={nicPassport}
-              onChange={(e) => setNicPassport(e.target.value)}
-              placeholder="Enter NIC or Passport number"
-            />
-          </div>
-        </div>
-
-        {/* Source of Foreign Currency */}
-        <div>
-          <Label className="text-base font-semibold">
-            Source of Foreign Currency *
-          </Label>
-          <div className="border border-gray-300 rounded-lg divide-y divide-gray-300">
-            {([
-              {
-                key: "Persons return for vacation from foreign employment",
-                label:
-                  "a) Persons return for vacation from foreign employment",
-              },
-              {
-                key: "Relatives of those employees abroad",
-                label: "b) Relatives of those employees abroad",
-              },
-              {
-                key: "Foreign tourists (directly or through tour guides)",
-                label:
-                  "c) Foreign tourists (directly or through tour guides)",
-              },
-              {
-                key: "Unutilized foreign currency obtained for travel purpose by residents",
-                label:
-                  "d) Unutilized foreign currency obtained for travel purpose by residents",
-              },
-              { key: "Other", label: "e) Other" },
-            ] as const).map((item) => (
-              <label
-                key={item.key}
-                className="flex justify-between items-center px-3 py-2"
-              >
-                <span className="text-gray-800 text-sm md:text-base">
-                  {item.label}
-                </span>
-                {item.key === "Other" && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="text"
-                      value={otherSource}
-                      onChange={(e) => setOtherSource(e.target.value)}
-                      placeholder="Specify"
-                      className="h-7 w-40 text-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!sources.includes("Other")) toggleSource("Other");
-                      }}
-                    />
-                    <span className="text-xs text-gray-500">
-                      If other specify
-                    </span>
-                  </div>
-                )}
-                <input
-                  type="checkbox"
-                  checked={sources.includes(item.key)}
-                  onChange={() => toggleSource(item.key)}
-                  className="appearance-none border-2 border-gray-400 rounded-sm w-12 h-6 checked:bg-blue-600 checked:border-blue-600 cursor-pointer transition-all"
-                />
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Currency Table */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          {/* Source of Foreign Currency */}
+          <div>
             <Label className="text-base font-semibold">
-              Currency Details
+              Source of Foreign Currency *
             </Label>
-            <Button onClick={addRow} size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Currency
+            <div className="border border-gray-300 rounded-lg divide-y divide-gray-300">
+              {SOURCE_OPTIONS.map((item) => (
+                <label
+                  key={item.key}
+                  className="flex justify-between items-center px-3 py-2"
+                >
+                  <span className="text-gray-800 text-sm md:text-base">
+                    {item.label}
+                  </span>
+                  {item.key === "Other" && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={otherSource}
+                        onChange={(e) => setOtherSource(e.target.value)}
+                        placeholder="Specify"
+                        className="h-7 w-40 text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!sources.includes("Other")) toggleSource("Other");
+                        }}
+                      />
+                      <span className="text-xs text-gray-500">
+                        If other specify
+                      </span>
+                    </div>
+                  )}
+                  <input
+                    type="checkbox"
+                    checked={sources.includes(item.key)}
+                    onChange={() => toggleSource(item.key)}
+                    className="appearance-none border-2 border-gray-400 rounded-sm w-12 h-6 checked:bg-blue-600 checked:border-blue-600 cursor-pointer transition-all"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Currency Table */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">
+                Currency Details
+              </Label>
+              <Button onClick={addRow} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Currency
+              </Button>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Currency Type</TableHead>
+                    <TableHead>Amount Received (FCY)</TableHead>
+                    <TableHead>Rate Offered</TableHead>
+                    <TableHead>Amount Issued (LKR)</TableHead>
+                    <TableHead className="w-20">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Select
+                          value={row.currencyType}
+                          onValueChange={(value) =>
+                            updateRow(row.id, "currencyType", value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              "USD",
+                              "GBP",
+                              "EUR",
+                              "CHF",
+                              "AUD",
+                              "NZD",
+                              "SGD",
+                              "INR",
+                              "CAD",
+                            ].map((cur) => (
+                              <SelectItem key={cur} value={cur}>
+                                {cur}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={row.amountReceived}
+                          onChange={(e) =>
+                            updateRow(
+                              row.id,
+                              "amountReceived",
+                              e.target.value
+                            )
+                          }
+                          placeholder="0.00"
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={row.rate}
+                          onChange={(e) =>
+                            updateRow(row.id, "rate", e.target.value)
+                          }
+                          placeholder="0.00"
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={row.amountIssued}
+                          readOnly
+                          className="bg-muted"
+                          placeholder="0.00"
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeRow(row.id)}
+                          disabled={rows.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {/* Save & Download Button */}
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={handleInitiateSave}
+              size="lg"
+              className="gap-2 bg-gradient-to-r from-accent to-accent/90"
+            >
+              <Save className="h-4 w-4" />
+              Save & Download PDF
             </Button>
           </div>
 
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Currency Type</TableHead>
-                  <TableHead>Amount Received (FCY)</TableHead>
-                  <TableHead>Rate Offered</TableHead>
-                  <TableHead>Amount Issued (LKR)</TableHead>
-                  <TableHead className="w-20">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <Select
-                        value={row.currencyType}
-                        onValueChange={(value) =>
-                          updateRow(row.id, "currencyType", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            "USD",
-                            "GBP",
-                            "EUR",
-                            "CHF",
-                            "AUD",
-                            "NZD",
-                            "SGD",
-                            "INR",
-                            "CAD",
-                          ].map((cur) => (
-                            <SelectItem key={cur} value={cur}>
-                              {cur}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
+          <div className="space-y-4 pt-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">
+                Issued Receipts in past 7 days
+              </h2>
+              {recentPDFs.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteAllPDFs}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete All
+                </Button>
+              )}
+            </div>
 
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={row.amountReceived}
-                        onChange={(e) =>
-                          updateRow(
-                            row.id,
-                            "amountReceived",
-                            e.target.value
-                          )
-                        }
-                        placeholder="0.00"
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={row.rate}
-                        onChange={(e) =>
-                          updateRow(row.id, "rate", e.target.value)
-                        }
-                        placeholder="0.00"
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={row.amountIssued}
-                        readOnly
-                        className="bg-muted"
-                        placeholder="0.00"
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeRow(row.id)}
-                        disabled={rows.length === 1}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
+            {recentPDFs.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No recent PDFs found on the server.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>File Name</TableHead>
+                    <TableHead>Date Created</TableHead>
+                    <TableHead className="w-20">Download</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-
-        {/* Save & Download Button */}
-        <div className="flex justify-end pt-4">
-          <Button
-            onClick={handleSaveAndDownload}
-            size="lg"
-            className="gap-2 bg-gradient-to-r from-accent to-accent/90"
-          >
-            <Save className="h-4 w-4" />
-            Save & Download PDF
-          </Button>
-        </div>
-
-        <div className="space-y-4 pt-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">
-              Issued Receipts in past 7 days
-            </h2>
-            {recentPDFs.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteAllPDFs}
-                className="gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete All
-              </Button>
+                </TableHeader>
+                <TableBody>
+                  {recentPDFs.map((pdf) => (
+                    <TableRow key={pdf.id}>
+                      <TableCell className="font-medium">
+                        {pdf.fileName}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(pdf.createdAt).toLocaleDateString(
+                          "en-GB"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={pdf.filePath}
+                          passHref
+                          target="_blank"
+                        >
+                          <Button variant="ghost" size="icon">
+                            <Download className="h-4 w-4 text-primary" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
+        </CardContent>
+      </Card>
 
-          {recentPDFs.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No recent PDFs found on the server.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>File Name</TableHead>
-                  <TableHead>Date Created</TableHead>
-                  <TableHead className="w-20">Download</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentPDFs.map((pdf) => (
-                  <TableRow key={pdf.id}>
-                    <TableCell className="font-medium">
-                      {pdf.fileName}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(pdf.createdAt).toLocaleDateString(
-                        "en-GB"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={pdf.filePath}
-                        passHref
-                        target="_blank"
-                      >
-                        <Button variant="ghost" size="icon">
-                          <Download className="h-4 w-4 text-primary" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      <ConfirmationModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleFinalProcess}
+        sourceLabels={SOURCE_LABELS_MAP}
+        isLoading={isProcessing}
+        previewData={{
+          customerName,
+          nicPassport,
+          date,
+          sources,
+          otherSource,
+          rows,
+        }}
+      />
+    </>
   );
 };
