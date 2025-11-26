@@ -22,6 +22,7 @@ import { Button } from "../ui/button";
 
 import { DateRangeFilter } from "../ui/DateRangeFilter";
 import { generateBalanceStatementPDF } from "../balanceStatement/pdfGenerator";
+import { toast } from "@/app/hooks/use-toast";
 
 interface CurrencyBalance {
   currencyType: string;
@@ -147,7 +148,11 @@ export default function BalanceStatement() {
     const amount = parseFloat(amountStr);
 
     if (isNaN(amount) || amount <= 0) {
-      console.error("Invalid deposit amount");
+      toast({
+      title: "Invalid Deposit",
+      description: "Please enter a valid deposit amount.",
+      variant: "destructive",
+    });
       return;
     }
 
@@ -162,8 +167,14 @@ export default function BalanceStatement() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        console.error("Server error:", await res.text());
+        toast({
+        title: "Deposit Error",
+        description: data.error || "Something went wrong",
+        variant: "destructive",
+      });
         return;
       }
 
@@ -271,30 +282,6 @@ export default function BalanceStatement() {
                 Add Deposit
               </Button>
             </div>
-
-            {/* ✅ Recent Deposits Preview */}
-            {/* {selectedCurrency && depositRecords[selectedCurrency] && depositRecords[selectedCurrency].length > 0 && (
-              <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                <h4 className="text-sm font-semibold mb-2">
-                  Recent deposits for {selectedCurrency}
-                </h4>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {depositRecords[selectedCurrency].map((deposit) => (
-                    <div
-                      key={deposit.id}
-                      className="flex justify-between items-center p-2 bg-background rounded border text-sm"
-                    >
-                      <span className="font-mono">
-                        {deposit.amount.toFixed(2)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(deposit.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )} */}
           </CardContent>
         </Card>
 
