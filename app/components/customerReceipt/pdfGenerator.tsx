@@ -156,10 +156,10 @@ export const generatePDF = (
   currentY += 4;
 
   const sourcesText = [
-    { key: "Persons return for vacation from foreign employment", label: "a) Foreign employment returnees" },
-    { key: "Relatives of those employees abroadives", label: "b) Relatives abroad" },
-    { key: "Foreign tourists (directly or through tour guides)", label: "c) Foreign tourists" },
-    { key: "Unutilized foreign currency obtained for travel purpose by residents", label: "d) Unutilized travel currency" },
+    { key: "Persons return for vacation from foreign employment", label: "a) Persons return for vacation from foreign employment" },
+    { key: "Relatives of those employees abroad", label: "b) Relatives of those employees abroad" },
+    { key: "Foreign tourists (Directly or through tour guides)", label: "c) Foreign tourists (Directly or through tour guides)" },
+    { key: "Unutilized foreign currency obtained for travel purpose by residents", label: "d) Unutilized foreign currency obtained for travel purpose by residents" },
     { key: "Other", label: "e) Other" },
   ];
 
