@@ -25,7 +25,7 @@ export async function GET() {
     });
     
     // Convert BigInt IDs and ensure a clean array is returned
-    const formattedPDFs = recentPDFs.map(pdf => ({
+    const formattedPDFs = recentPDFs.map((pdf) => ({
         ...pdf,
         id: pdf.id.toString(),
         // Convert createdAt to string for easier client-side consumption
