@@ -25,12 +25,23 @@ type CurrencyBalance = {
   closingBalance: string;
 };
 
-// Helper function to create the date object for the day before 'from'
-const getPreviousDay = (date: Date) => {
+// Helper: get previous day's end in UTC
+const getPreviousDayUTC = (date: Date) => {
   const prev = new Date(date);
-  prev.setDate(date.getDate() - 1);
-  prev.setHours(23, 59, 59, 999);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  prev.setUTCHours(23, 59, 59, 999);
   return prev;
+};
+
+// Helper: parse date string to UTC start/end
+const parseDateUTC = (dateStr: string, isEndOfDay = false) => {
+  const date = new Date(dateStr);
+  if (isEndOfDay) {
+    date.setUTCHours(23, 59, 59, 999);
+  } else {
+    date.setUTCHours(0, 0, 0, 0);
+  }
+  return date;
 };
 
 export async function GET(req: NextRequest) {
@@ -44,23 +55,18 @@ export async function GET(req: NextRequest) {
         { error: "Missing date range" },
         { status: 400 }
       );
-    } // Calculate 'from' (start of day) and 'to' (end of day)
+    }
 
-    const from = new Date(fromDateParam);
-    from.setHours(0, 0, 0, 0);
-
-    const to = new Date(toDateParam);
-    to.setHours(23, 59, 59, 999);
-
-    const prevDay = getPreviousDay(from);
-
-    const results: CurrencyBalance[] = [];
+    // Parse dates as UTC
+    const from = parseDateUTC(fromDateParam, false);
+    const to = parseDateUTC(toDateParam, true);
+    const prevDay = getPreviousDayUTC(from);
 
     const processingPromises = CURRENCIES.map(async (currency) => {
-      //Find the previous day's closing for the Opening Balance
+      // 1️⃣ Previous day's closing balance
       const previousBalance = await prisma.dailyCurrencyBalance.findFirst({
         where: {
-          currencyType: currency, // Use the date of the day[] before] the 'from' date
+          currencyType: currency,
           date: { lte: prevDay },
         },
         orderBy: { date: "desc" },
@@ -69,18 +75,22 @@ export async function GET(req: NextRequest) {
 
       const openingBalance = previousBalance
         ? Number(previousBalance.closingBalance)
-        : 0; // 2. Aggregate Purchases for the ENTIRE date range (from to to) in one query
+        : 0;
 
+      // 2️⃣ Aggregate purchases
       const purchasesAgg = await prisma.customerReceiptCurrency.aggregate({
         _sum: { amountFcy: true },
         where: {
-          currencyType: currency, // Check receiptDate is between from (inclusive) and to (inclusive)
-          receipt: { receiptDate: { gte: from, lte: to } },
+          currencyType: currency,
+          receipt: {
+            receiptDate: { gte: from, lte: to },
+          },
         },
       });
 
-      const totalPurchases = Number(purchasesAgg._sum.amountFcy ?? 0); // 3. Aggregate Deposits for the ENTIRE date range (from to to) in one query
+      const totalPurchases = Number(purchasesAgg._sum.amountFcy ?? 0);
 
+      // 3️⃣ Aggregate deposits
       const depositsAgg = await prisma.depositRecord.aggregate({
         _sum: { amount: true },
         where: {
@@ -89,12 +99,26 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      const totalDeposits = Number(depositsAgg._sum.amount ?? 0); 
+      const totalDeposits = Number(depositsAgg._sum.amount ?? 0);
 
+      // 4️⃣ Other fields placeholders
       const totalExchangeBuy = 0;
       const totalExchangeSell = 0;
-      const totalSales = 0; 
+      const totalSales = 0;
 
+      // 5️⃣ Skip currency if completely empty
+      if (
+        openingBalance === 0 &&
+        totalPurchases === 0 &&
+        totalDeposits === 0 &&
+        totalExchangeBuy === 0 &&
+        totalExchangeSell === 0 &&
+        totalSales === 0
+      ) {
+        return null; // skip this currency
+      }
+
+      // 6️⃣ Calculate closing balance
       const closingBalance =
         openingBalance +
         totalPurchases +
@@ -113,9 +137,12 @@ export async function GET(req: NextRequest) {
         deposits: totalDeposits.toFixed(2),
         closingBalance: closingBalance.toFixed(2),
       };
-    }); // Wait for all currencies to be processed concurrently
+    });
 
-    const finalResults = await Promise.all(processingPromises);
+    // Wait for all promises and filter out nulls
+    const finalResults = (await Promise.all(processingPromises)).filter(
+      Boolean
+    );
 
     return NextResponse.json(finalResults);
   } catch (err) {

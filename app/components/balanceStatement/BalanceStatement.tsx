@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -44,16 +44,18 @@ interface DepositRecord {
 }
 
 export interface BalanceStatementPDFData {
-    fromDate: string;
-    toDate: string;
-    balances: CurrencyBalance[];
+  fromDate: string;
+  toDate: string;
+  balances: CurrencyBalance[];
 }
 
 export default function BalanceStatement() {
   const [fromDate, setFromDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
+  const [toDate, setToDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   const [balances, setBalances] = useState<CurrencyBalance[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,7 +63,6 @@ export default function BalanceStatement() {
   const [depositRecords, setDepositRecords] = useState<Record<string, DepositRecord[]>>({});
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
 
-  // ✅ Fetch balance data
   const fetchBalanceData = async () => {
     try {
       setLoading(true);
@@ -73,8 +74,7 @@ export default function BalanceStatement() {
       if (!res.ok) throw new Error("Failed to fetch balance data");
 
       const response = await res.json();
-      console.log("Fetched data:", response);
-
+      console.log(response)
       const data: CurrencyBalance[] = Array.isArray(response)
         ? response
         : response.rows || [];
@@ -87,28 +87,42 @@ export default function BalanceStatement() {
     }
   };
 
-  // ✅ Fetch deposit records for a specific currency
-  const fetchDepositRecords = async (currencyType: string) => {
-    try {
-      const res = await fetch(
-        `/api/balance-statement/deposits?currency=${currencyType}&date=${toDate}`
-      );
+  // =========================
+  // Fetch deposit records (MEMOIZED)
+  // =========================
+  const fetchDepositRecords = useCallback(
+    async (currencyType: string) => {
+      try {
+        const res = await fetch(
+          `/api/balance-statement/deposits?currency=${currencyType}&date=${toDate}`
+        );
 
-      if (!res.ok) throw new Error("Failed to fetch deposit records");
+        if (!res.ok) throw new Error("Failed to fetch deposit records");
 
-      const deposits: DepositRecord[] = await res.json();
-      setDepositRecords(prev => ({
-        ...prev,
-        [currencyType]: deposits
-      }));
-    } catch (err) {
-      console.error("Error fetching deposit records:", err);
-    }
-  };
+        const deposits: DepositRecord[] = await res.json();
 
-  // ✅ Filter visible rows
-  const visibleBalances = balances.filter((b: CurrencyBalance) => {
-    const hasTransactions = ["purchases", "exchangeBuy", "exchangeSell", "sales", "deposits"].some(
+        setDepositRecords((prev) => ({
+          ...prev,
+          [currencyType]: deposits,
+        }));
+      } catch (err) {
+        console.error("Error fetching deposit records:", err);
+      }
+    },
+    [toDate]
+  );
+
+  // =========================
+  // Filter visible balances
+  // =========================
+  const visibleBalances = balances.filter((b) => {
+    const hasTransactions = [
+      "purchases",
+      "exchangeBuy",
+      "exchangeSell",
+      "sales",
+      "deposits",
+    ].some(
       (field) => parseFloat(b[field as keyof CurrencyBalance] || "0") !== 0
     );
 
@@ -117,19 +131,22 @@ export default function BalanceStatement() {
     return hasOpening || hasTransactions;
   });
 
-  // ✅ Fetch on first load
+
   useEffect(() => {
     fetchBalanceData();
-  },[] );
+  }, []);
 
-  // ✅ Fetch deposit records when balances change
   useEffect(() => {
-    visibleBalances.forEach(balance => {
-      if (parseFloat(balance.deposits || "0") > 0) {
+    visibleBalances.forEach((balance) => {
+      const hasDeposits = parseFloat(balance.deposits || "0") > 0;
+      const alreadyFetched = depositRecords[balance.currencyType];
+
+      if (hasDeposits && !alreadyFetched) {
         fetchDepositRecords(balance.currencyType);
       }
     });
-  }, [fetchDepositRecords,visibleBalances,balances]);
+  }, [visibleBalances, depositRecords, fetchDepositRecords]);
+
 
   const handleDepositInput = (value: string) => {
     setDepositInputs((prev) => ({
@@ -139,20 +156,16 @@ export default function BalanceStatement() {
   };
 
   const handleSaveDeposit = async () => {
-    if (!selectedCurrency) {
-      console.error("No currency selected");
-      return;
-    }
+    if (!selectedCurrency) return;
 
-    const amountStr = depositInputs[selectedCurrency] || "";
-    const amount = parseFloat(amountStr);
+    const amount = parseFloat(depositInputs[selectedCurrency] || "");
 
     if (isNaN(amount) || amount <= 0) {
       toast({
-      title: "Invalid Deposit",
-      description: "Please enter a valid deposit amount.",
-      variant: "destructive",
-    });
+        title: "Invalid Deposit",
+        description: "Please enter a valid deposit amount.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -171,47 +184,45 @@ export default function BalanceStatement() {
 
       if (!res.ok) {
         toast({
-        title: "Error",
-        description: data.error || "Something went wrong",
-        variant: "destructive",
-      });
+          title: "Error",
+          description: data.error || "Something went wrong",
+          variant: "destructive",
+        });
         return;
       }
 
       setDepositInputs((prev) => ({ ...prev, [selectedCurrency]: "" }));
       setSelectedCurrency("");
 
-      // Refresh data and deposit records
+      // Refresh data
       await fetchBalanceData();
-      await fetchDepositRecords(selectedCurrency);
+
+      // Force refetch deposits for updated currency
+      setDepositRecords((prev) => {
+        const copy = { ...prev };
+        delete copy[selectedCurrency];
+        return copy;
+      });
     } catch (err) {
       console.error("Error saving deposit:", err);
     }
   };
 
-  // ✅ Calculate total deposits for a currency
   const getTotalDeposits = (currencyType: string): number => {
-    const balance = balances.find(b => b.currencyType === currencyType);
+    const balance = balances.find((b) => b.currencyType === currencyType);
     return balance ? parseFloat(balance.deposits || "0") : 0;
   };
 
-  // ✅ Get available currencies for deposit
-  const availableCurrencies = visibleBalances.map(balance => balance.currencyType);
+  const availableCurrencies = visibleBalances.map(
+    (balance) => balance.currencyType
+  );
 
   const handleDownloadReport = () => {
-    const pdfData: BalanceStatementPDFData = {
+    generateBalanceStatementPDF({
       fromDate,
       toDate,
-      // Use the visibleBalances (filtered rows) for the report
-      balances: visibleBalances, 
-    };
-
-    try {
-        generateBalanceStatementPDF(pdfData);
-    } catch (error) {
-        console.error("Error generating PDF:", error);
-        // Add a toast notification here if you have one available, like the CustomerReceipt component
-    }
+      balances: visibleBalances,
+    });
   };
 
   return (

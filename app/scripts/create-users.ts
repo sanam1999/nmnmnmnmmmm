@@ -4,21 +4,26 @@ import bcrypt from "bcrypt";
 const prisma = new PrismaClient();
 
 async function main() {
-  const emails = [
-    "billuvaai@gmail.com"
+  // Email → Password mapping
+  const users = [
+    { email: "it@pearlgrouphotels.com", password: "pearlgrouphotels@65" },
+    { email: "moneyexchange@pearlgrouphotels.com", password: "moneyexchange@34" },
+    { email: "accounts@pearlgrouphotels.com", password: "accounts@54" },
   ];
 
-  for (const email of emails) {
-    const passwordHash = await bcrypt.hash("Admin@123", 10);
+  for (const user of users) {
+    const passwordHash = await bcrypt.hash(user.password, 10);
 
     await prisma.user.upsert({
-      where: { email },
-      update: {},
+      where: { email: user.email },
+      update: { passwordHash },
       create: {
-        email,
-        passwordHash
-      } 
+        email: user.email,
+        passwordHash,
+      },
     });
+
+    console.log(`User synced: ${user.email}`);
   }
 }
 
@@ -30,3 +35,7 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+
+
+
