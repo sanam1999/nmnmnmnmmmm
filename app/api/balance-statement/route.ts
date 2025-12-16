@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../libs/prisma";
 import { toDayDate } from "../../libs/day";
+
 const CURRENCIES = [
   "USD",
   "GBP",
@@ -38,19 +39,30 @@ export async function GET(req: NextRequest) {
     const fromDateParam = searchParams.get("fromDate");
     const toDateParam = searchParams.get("toDate");
 
+    let from: Date;
+    let to: Date;
+
+    // Parse dates with validation
     if (!fromDateParam || !toDateParam) {
-      return NextResponse.json(
-        { error: "Missing date range" },
-        { status: 400 }
-      );
-    } // Calculate 'from' (start of day) and 'to' (end of day)
+      // Default to today if no dates provided
+      const today = new Date();
+      from = toDayDate(today);
+      to = toDayDate(today);
+    } else {
+      // Parse provided dates
+      const fromParsed = new Date(fromDateParam);
+      const toParsed = new Date(toDateParam);
 
-    const from = toDayDate(fromDateParam);
-    //from.setHours(0, 0, 0, 0);
+      if (isNaN(fromParsed.getTime()) || isNaN(toParsed.getTime())) {
+        return NextResponse.json(
+          { error: "Invalid date format" },
+          { status: 400 }
+        );
+      }
 
-    const to = toDayDate(toDateParam);
-    //to.setHours(23, 59, 59, 999);
-
+      from = toDayDate(fromParsed);
+      to = toDayDate(toParsed);
+    }
     const prevDay = getPreviousDay(from);
 
     const results: CurrencyBalance[] = [];

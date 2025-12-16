@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -48,15 +50,26 @@ export interface BalanceStatementPDFData {
   toDate: string;
   balances: CurrencyBalance[];
 }
+const fetchSriLankaTime = async () => {
+  const res = await fetch("/api/date");
+  if (!res.ok) throw new Error("Error fetching date");
+  return res.json();
+};
+
+// Helper to get Sri Lanka date string YYYY-MM-DD
+export const getSriLankaDateString = async (): Promise<string | null> => {
+  try {
+    const data = await fetchSriLankaTime();
+    return data.date;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+};
 
 export default function BalanceStatement() {
-  const [fromDate, setFromDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [toDate, setToDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
   const [balances, setBalances] = useState<CurrencyBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [depositInputs, setDepositInputs] = useState<Record<string, string>>({});
@@ -133,7 +146,27 @@ export default function BalanceStatement() {
 
 
   useEffect(() => {
-    fetchBalanceData();
+    const fetchWhenReady = () => {
+      if (fromDate != null) {
+        fetchBalanceData();
+      } else {
+        // Retry after delay
+        setTimeout(fetchWhenReady, 3000);
+      }
+    };
+
+    fetchWhenReady();
+  }, []);
+
+  useEffect(() => {
+    const fetchDate = async () => {
+      const date = await getSriLankaDateString();
+      if (date) {
+        setFromDate(date);
+        setToDate(date);
+      }
+    };
+    fetchDate();
   }, []);
 
   useEffect(() => {
@@ -269,7 +302,7 @@ export default function BalanceStatement() {
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-2 block">
                     Deposit Amount
@@ -284,7 +317,7 @@ export default function BalanceStatement() {
                   />
                 </div>
               </div>
-              
+
               <Button
                 variant="default"
                 onClick={handleSaveDeposit}
@@ -334,7 +367,7 @@ export default function BalanceStatement() {
                         <span className="font-mono text-lg font-semibold">
                           {getTotalDeposits(balance.currencyType).toFixed(2)}
                         </span>
-                  
+
                       </div>
                     </TableCell>
 
@@ -363,5 +396,5 @@ export default function BalanceStatement() {
     </Card>
   );
 
-  
+
 }

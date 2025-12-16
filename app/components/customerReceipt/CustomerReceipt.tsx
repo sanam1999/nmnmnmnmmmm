@@ -26,15 +26,28 @@ import { generatePDF, PDFData } from "./pdfGenerator";
 import { blacklistedCustomers } from "../../libs/blacklist";
 import Link from "next/link";
 import { toDayDate } from "../../libs/day";
-import { ConfirmationModal } from "../ui/ConfirmModal"; 
+import { ConfirmationModal } from "../ui/ConfirmModal";
+
+//get time and date from server
+const fetchSriLankaTime = async () => {
+  const res = await fetch("/api/date");
+  if (!res.ok) throw new Error("Error fetching date");
+  return res.json();
+};
 
 // Helper to get Sri Lanka date string YYYY-MM-DD
-const getSriLankaDateString = (date: Date = new Date()) => {
-  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Colombo" });
+export const getSriLankaDateString = async (): Promise<string | null> => {
+  try {
+    const data = await fetchSriLankaTime();
+    return data.date;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 };
 
 // Convert UTC string to Sri Lanka local datetime string
-const formatSriLankaDateTime = (utcString: string) => {
+export const formatSriLankaDateTime = (utcString: string) => {
   return new Date(utcString).toLocaleString("en-LK", {
     timeZone: "Asia/Colombo",
   });
@@ -92,7 +105,7 @@ const SOURCE_LABELS_MAP = SOURCE_OPTIONS.reduce((acc, item) => {
 
 export const CustomerReceipt = () => {
   const [serialNo, setSerialNo] = useState("");
-  const [date, setDate] = useState(getSriLankaDateString());
+  const [date, setDate] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [nicPassport, setNicPassport] = useState("");
   const [sources, setSources] = useState<string[]>([]);
@@ -108,18 +121,26 @@ export const CustomerReceipt = () => {
   ]);
 
   const [recentPDFs, setRecentPDFs] = useState<SavedPDF[]>([]);
-  
-  // MODAL STATES
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Function to fetch recent PDFs
+  // fetch server date & initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      const slDate = await getSriLankaDateString();
+      if (slDate) setDate(slDate);
+
+      fetchRecentPDFs();
+      loadSerial();
+    };
+    fetchInitialData();
+  }, []);
+
   const fetchRecentPDFs = async () => {
     try {
       const res = await fetch("/api/customer-receipt/pdfs");
       const data = await res.json();
       if (res.ok) {
-        // Sort by newest first
         const formattedPDFs = data.pdfs.map((pdf: SavedPDF) => ({
           ...pdf,
           createdAt: formatSriLankaDateTime(pdf.createdAt),
@@ -127,8 +148,7 @@ export const CustomerReceipt = () => {
         setRecentPDFs(
           formattedPDFs.sort(
             (a: SavedPDF, b: SavedPDF) =>
-              new Date(b.createdAt).getTime() -
-              new Date(a.createdAt).getTime()
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )
         );
       } else {
@@ -152,11 +172,6 @@ export const CustomerReceipt = () => {
       console.error("Failed to load serial:", msg);
     }
   };
-
-  useEffect(() => {
-    fetchRecentPDFs();
-    loadSerial();
-  }, []);
 
   const addRow = () => {
     setRows([
@@ -200,9 +215,7 @@ export const CustomerReceipt = () => {
     }
   };
 
-  // 1. Initial Click Handler: Validation & Open Modal
   const handleInitiateSave = () => {
-    // Basic Validation
     if (!customerName || !nicPassport || sources.length === 0) {
       toast({
         title: "Missing Information",
@@ -212,7 +225,7 @@ export const CustomerReceipt = () => {
       return;
     }
 
-    // Blacklisted check
+
     const customerInput = nicPassport.trim().toUpperCase();
     const nameInput = customerName.trim().toLowerCase();
 
@@ -237,11 +250,9 @@ export const CustomerReceipt = () => {
       return;
     }
 
-    // If validation passes, open the modal
     setIsModalOpen(true);
   };
 
-  // 2. Final Logic: Actual Save & Download (Called by Modal onConfirm)
   const handleFinalProcess = async () => {
     setIsProcessing(true);
     try {
@@ -287,29 +298,24 @@ export const CustomerReceipt = () => {
       const fileName = `Receipt-${newReceipt.serialNumber}.pdf`;
 
       if (pdfBase64) {
-        const savePdfRes = await fetch(
-          "/api/customer-receipt/save-pdf",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              receiptId: newReceipt.id,
-              fileName,
-              pdfBase64,
-            }),
-          }
-        );
+        const savePdfRes = await fetch("/api/customer-receipt/save-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            receiptId: newReceipt.id,
+            fileName,
+            pdfBase64,
+          }),
+        });
 
         const savePdfData = await savePdfRes.json();
         if (!savePdfRes.ok) throw new Error(savePdfData.error);
 
-        // Download locally
         generatePDF(pdfData, true);
 
         fetchRecentPDFs();
       }
 
-      // Reset Form
       setSerialNo("");
       setCustomerName("");
       setNicPassport("");
@@ -324,10 +330,9 @@ export const CustomerReceipt = () => {
           amountIssued: "",
         },
       ]);
-      
-      // Close Modal on success
+
       setIsModalOpen(false);
-      
+      loadSerial();
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -349,10 +354,9 @@ export const CustomerReceipt = () => {
     if (!confirm("Are you sure you want to delete all PDFs?")) return;
 
     try {
-      const res = await fetch(
-        "/api/customer-receipt/delete-all-pdfs",
-        { method: "DELETE" }
-      );
+      const res = await fetch("/api/customer-receipt/delete-all-pdfs", {
+        method: "DELETE",
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
@@ -613,7 +617,7 @@ export const CustomerReceipt = () => {
                   className="gap-2"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete All
+                  Delete
                 </Button>
               )}
             </div>
@@ -662,6 +666,7 @@ export const CustomerReceipt = () => {
         </CardContent>
       </Card>
 
+
       <ConfirmationModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -677,6 +682,7 @@ export const CustomerReceipt = () => {
           rows,
         }}
       />
+
     </>
   );
 };

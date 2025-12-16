@@ -34,15 +34,42 @@ interface PurchaseRecord {
   remarks: string;
   currencies: CurrencyDetail[];
 }
+const fetchSriLankaTime = async () => {
+  const res = await fetch("/api/date");
+  if (!res.ok) throw new Error("Error fetching date");
+  return res.json();
+};
+
+// Helper to get Sri Lanka date string YYYY-MM-DD
+export const getSriLankaDateString = async (): Promise<string | null> => {
+  try {
+    const data = await fetchSriLankaTime();
+    return data.date;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+};
 
 export const PurchaseRegister = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [filteredPurchases, setFilteredPurchases] = useState<PurchaseRecord[]>([]);
-  const [fromDate, setFromDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [toDate, setToDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
   const [loading, setLoading] = useState(false);
-
+  const [today, settodaydate]= useState<string>("")
+  useEffect(() => {
+    const fetchDate = async () => {
+      const date = await getSriLankaDateString();
+      if (date) {
+        setFromDate(date);
+        setToDate(date);
+        settodaydate(date);
+      }
+    };
+    fetchDate();
+  }, []);
   // Fetch purchases on mount
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -53,7 +80,7 @@ export const PurchaseRegister = () => {
           try {
             const errData = await res.json();
             errorMsg = errData?.error || errorMsg;
-          } catch {}
+          } catch { }
           throw new Error(errorMsg);
         }
 
@@ -170,7 +197,7 @@ export const PurchaseRegister = () => {
           </div>
           <div className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg border border-green-500/20">
             <p className="text-sm text-muted-foreground">Today&apos;s Date</p>
-            <p className="text-2xl font-bold">{new Date().toLocaleDateString()}</p>
+            <p className="text-2xl font-bold">{today}</p>
           </div>
         </div>
 
