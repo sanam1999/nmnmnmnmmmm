@@ -49,8 +49,11 @@ export async function GET(req: NextRequest) {
 
     console.log(`Found ${deposits.length} deposits for ${currency}`);
 
+    // ✅ FIX: infer type from deposits array
+    type Deposit = (typeof deposits)[number];
+
     // Convert BigInt to string for JSON serialization if needed
-    const serializedDeposits = deposits.map(deposit => ({
+    const serializedDeposits = deposits.map((deposit: Deposit) => ({
       ...deposit,
       id: deposit.id.toString(),
       amount: Number(deposit.amount),
