@@ -16,7 +16,7 @@
 /coverage
 
 # next.js
-
+/.next/
 /out/
 
 # production
@@ -44,5 +44,5 @@ next-env.d.ts
 
 /app/generated/prisma
 
-public/pdf
+/public/pdf/
 
