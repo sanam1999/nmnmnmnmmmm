@@ -1,0 +1,22 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/balance-statement/deposits/route": "app/api/balance-statement/deposits/route.js",
+  "/api/balance-statement/route": "app/api/balance-statement/route.js",
+  "/api/balance-statement/update-deposit/route": "app/api/balance-statement/update-deposit/route.js",
+  "/api/customer-receipt/delete-all-pdfs/route": "app/api/customer-receipt/delete-all-pdfs/route.js",
+  "/api/customer-receipt/next-serial/route": "app/api/customer-receipt/next-serial/route.js",
+  "/api/customer-receipt/pdfs/route": "app/api/customer-receipt/pdfs/route.js",
+  "/api/customer-receipt/route": "app/api/customer-receipt/route.js",
+  "/api/customer-receipt/save-pdf/route": "app/api/customer-receipt/save-pdf/route.js",
+  "/api/date/route": "app/api/date/route.js",
+  "/api/password/forgot/route": "app/api/password/forgot/route.js",
+  "/api/password/reset/route": "app/api/password/reset/route.js",
+  "/api/purchase-register/route": "app/api/purchase-register/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/forgot-password/page": "app/forgot-password/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/reset-password/page": "app/reset-password/page.js"
+}

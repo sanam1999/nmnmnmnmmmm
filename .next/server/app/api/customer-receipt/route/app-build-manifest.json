@@ -1,0 +1,12 @@
+{
+  "pages": {
+    "/api/customer-receipt/route": [
+      "static/chunks/4ac525f5146ff0c7.js",
+      "static/chunks/e6b0468bc5e7fb2f.js",
+      "static/chunks/d840202ccc76954a.js",
+      "static/chunks/6f7476344054db30.js",
+      "static/chunks/2008ffcf9e5b170c.js",
+      "static/chunks/turbopack-e68193a90e38d665.js"
+    ]
+  }
+}

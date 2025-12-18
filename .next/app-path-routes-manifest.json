@@ -1,0 +1,22 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/auth/[...nextauth]/route": "/api/auth/[...nextauth]",
+  "/api/balance-statement/deposits/route": "/api/balance-statement/deposits",
+  "/api/balance-statement/route": "/api/balance-statement",
+  "/api/balance-statement/update-deposit/route": "/api/balance-statement/update-deposit",
+  "/api/customer-receipt/delete-all-pdfs/route": "/api/customer-receipt/delete-all-pdfs",
+  "/api/customer-receipt/next-serial/route": "/api/customer-receipt/next-serial",
+  "/api/customer-receipt/pdfs/route": "/api/customer-receipt/pdfs",
+  "/api/customer-receipt/route": "/api/customer-receipt",
+  "/api/customer-receipt/save-pdf/route": "/api/customer-receipt/save-pdf",
+  "/api/date/route": "/api/date",
+  "/api/password/forgot/route": "/api/password/forgot",
+  "/api/password/reset/route": "/api/password/reset",
+  "/api/purchase-register/route": "/api/purchase-register",
+  "/dashboard/page": "/dashboard",
+  "/favicon.ico/route": "/favicon.ico",
+  "/forgot-password/page": "/forgot-password",
+  "/login/page": "/login",
+  "/page": "/",
+  "/reset-password/page": "/reset-password"
+}

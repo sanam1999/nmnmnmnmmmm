@@ -1,0 +1,3 @@
+{
+  "/api/customer-receipt/save-pdf/route": "app/api/customer-receipt/save-pdf/route.js"
+}
