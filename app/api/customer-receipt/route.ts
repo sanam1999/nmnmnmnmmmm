@@ -1,3 +1,4 @@
+// app/api/customer-receipt/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../libs/prisma";
 import { updateDailyBalances } from "@/app/libs/updateDailyBalance";
@@ -84,13 +85,16 @@ export async function POST(req: NextRequest) {
 
     await updateDailyBalances(receipt.id);
 
+    // ✅ FIX: infer currency type safely
+    type ReceiptCurrency = (typeof receipt.currencies)[number];
+
     // Return BigInt-safe JSON
     return NextResponse.json({
       message: "Receipt saved successfully",
       receipt: {
         ...receipt,
         id: receipt.id.toString(),
-        currencies: receipt.currencies.map((c) => ({
+        currencies: receipt.currencies.map((c: ReceiptCurrency) => ({
           ...c,
           id: c.id.toString(),
           receiptId: c.receiptId.toString(),
@@ -99,7 +103,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: unknown) {
-    // Narrow error safely without using "any"
     if (
       typeof err === "object" &&
       err !== null &&

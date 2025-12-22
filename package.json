@@ -5,7 +5,7 @@
   "scripts": {
     "predev": "dotenv -e .env npx prisma generate && dotenv -e .env npx prisma migrate dev",
     "dev": "npm run predev && next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "dotenv -e .env npx prisma generate && dotenv -e .env npx prisma migrate dev && next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
