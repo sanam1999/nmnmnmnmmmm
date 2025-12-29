@@ -1,3 +1,4 @@
+// app/api/balance-statement/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../libs/prisma";
 import { toDayDate } from "../../libs/day";
@@ -92,24 +93,51 @@ export async function GET(req: NextRequest) {
           },
         },
       });
-
       const totalPurchases = Number(purchasesAgg._sum.amountFcy ?? 0);
 
-      // Calculate total deposits for the period
-      const depositsAgg = await prisma.depositRecord.aggregate({
-        _sum: { amount: true },
+      // FIXED: Calculate deposits for each day in the range and sum them
+      let totalDeposits = 0;
+      const currentDate = new Date(from);
+      while (currentDate <= to) {
+        const dayDate = toDayDate(currentDate);
+        
+        const dayDepositsAgg = await prisma.depositRecord.aggregate({
+          _sum: { amount: true },
+          where: {
+            currencyType: currency,
+            date: dayDate, // Exact day match
+          },
+        });
+        
+        totalDeposits += Number(dayDepositsAgg._sum.amount ?? 0);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Get exchange and sales totals from daily records
+      const dailyRecords = await prisma.dailyCurrencyBalance.findMany({
         where: {
           currencyType: currency,
-          date: { gte: from, lte: toEndOfDay },
+          date: { gte: from, lte: to },
+        },
+        select: {
+          exchangeBuy: true,
+          exchangeSell: true,
+          sales: true,
         },
       });
 
-      const totalDeposits = Number(depositsAgg._sum.amount ?? 0);
-
-      // Exchange and sales (currently 0, but kept for future use)
-      const totalExchangeBuy = 0;
-      const totalExchangeSell = 0;
-      const totalSales = 0;
+      const totalExchangeBuy = dailyRecords.reduce(
+        (sum, record) => sum + Number(record.exchangeBuy ?? 0),
+        0
+      );
+      const totalExchangeSell = dailyRecords.reduce(
+        (sum, record) => sum + Number(record.exchangeSell ?? 0),
+        0
+      );
+      const totalSales = dailyRecords.reduce(
+        (sum, record) => sum + Number(record.sales ?? 0),
+        0
+      );
 
       // Calculate closing balance using complete formula
       const closingBalance =
@@ -143,4 +171,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
