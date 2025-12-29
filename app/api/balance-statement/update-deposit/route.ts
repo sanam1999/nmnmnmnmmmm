@@ -1,4 +1,6 @@
-// app/api/balance-statement/update-deposit/route.ts
+// ============================================================================
+// FILE 2: app/api/balance-statement/update-deposit/route.ts
+// ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../libs/prisma";
 import { toDayDate } from "../../../libs/day";
@@ -16,90 +18,93 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    const day = toDayDate(date);
+    const day = toDayDate(new Date(date));
+    const dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
 
-    // 1. VALIDATE AGAINST PRE-DEPOSIT BALANCE
-    const existingRow = await prisma.dailyCurrencyBalance.findUnique({
-      where: { currencyType_date: { currencyType, date: day } },
+    // Get opening balance from MOST RECENT previous day
+    const prevDay = new Date(day.getTime() - 86400000);
+    const prevDayDate = toDayDate(prevDay);
+
+    const prevBalance = await prisma.dailyCurrencyBalance.findFirst({
+      where: {
+        currencyType,
+        date: { lte: prevDayDate },
+      },
+      orderBy: { date: "desc" },
+      select: { closingBalance: true },
     });
 
-    if (existingRow) {
-      const preDepositClosing =
-        Number(existingRow.openingBalance ?? 0) +
-        Number(existingRow.purchases ?? 0) +
-        Number(existingRow.exchangeBuy ?? 0) -
-        Number(existingRow.exchangeSell ?? 0) -
-        Number(existingRow.sales ?? 0);
+    const openingBalance = Number(prevBalance?.closingBalance ?? 0);
 
-      if (depositAmount > preDepositClosing) {
-        return NextResponse.json(
-          { error: "Deposit amount cannot exceed today's available balance." },
-          { status: 400 }
-        );
-      }
-    }
-
-    // 2. Insert deposit audit record
-    await prisma.depositRecord.create({
-      data: { currencyType, amount: depositAmount, date: day },
+    // Calculate today's purchases
+    const purchasesAgg = await prisma.customerReceiptCurrency.aggregate({
+      _sum: { amountFcy: true },
+      where: {
+        currencyType,
+        receipt: {
+          receiptDate: {
+            gte: day,
+            lte: dayEnd,
+          },
+        },
+      },
     });
 
+    const purchases = Number(purchasesAgg._sum.amountFcy ?? 0);
 
-    // 3. Aggregate today's deposits
-    const agg = await prisma.depositRecord.aggregate({
+    // Get current total deposits for this day
+    const currentDepositsAgg = await prisma.depositRecord.aggregate({
       _sum: { amount: true },
       where: { currencyType, date: day },
     });
 
-    const totalDeposits = Number(agg._sum.amount ?? 0);
+    const currentTotalDeposits = Number(currentDepositsAgg._sum.amount ?? 0);
 
+    // Validate deposit amount
+    const preDepositBalance = openingBalance + purchases;
+    const availableBalance = preDepositBalance - currentTotalDeposits;
 
-    // 4. Find or create today's daily balance row
-    let daily = existingRow;
+    if (depositAmount > availableBalance) {
+      return NextResponse.json(
+        {
+          error: `Deposit exceeds available balance. Available: ${availableBalance.toFixed(
+            2
+          )}, Requested: ${depositAmount.toFixed(2)}`,
+        },
+        { status: 400 }
+      );
+    }
 
-    if (!daily) {
-      // Get previous day for opening balance
-      const prevDay = new Date(day.getTime() - 86400000);
+    // Create deposit record
+    await prisma.depositRecord.create({
+      data: {
+        currencyType,
+        amount: depositAmount,
+        date: day,
+      },
+    });
 
-      const prev = await prisma.dailyCurrencyBalance.findUnique({
-        where: { currencyType_date: { currencyType, date: prevDay } },
-      });
+    // Calculate new totals
+    const newTotalDeposits = currentTotalDeposits + depositAmount;
+    const newClosingBalance = preDepositBalance - newTotalDeposits;
 
-      const openingBalance = Number(prev?.closingBalance ?? 0);
+    // Update or create daily balance
+    const existingDaily = await prisma.dailyCurrencyBalance.findUnique({
+      where: { currencyType_date: { currencyType, date: day } },
+    });
 
-      // Calculate today's purchases only
-      const dayStart = new Date(day);
-      const dayEnd = new Date(day);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const purchasesAgg = await prisma.customerReceiptCurrency.aggregate({
-        _sum: { amountFcy: true },
-        where: {
-          currencyType,
-          receipt: {
-            receiptDate: {
-              gte: dayStart,
-              lte: dayEnd,
-            },
-          },
+    if (existingDaily) {
+      await prisma.dailyCurrencyBalance.update({
+        where: { id: existingDaily.id },
+        data: {
+          openingBalance,
+          deposits: newTotalDeposits,
+          closingBalance: newClosingBalance,
         },
       });
-
-      const purchases = Number(purchasesAgg._sum.amountFcy ?? 0);
-
-      // Validate again for new row
-      const preDepositClosing = openingBalance + purchases;
-      if (depositAmount > preDepositClosing) {
-        return NextResponse.json(
-          { error: "Deposit amount cannot exceed today's available balance." },
-          { status: 400 }
-        );
-      }
-
-      // Create new row
-      const closing = preDepositClosing - totalDeposits;
-
-      daily = await prisma.dailyCurrencyBalance.create({
+    } else {
+      await prisma.dailyCurrencyBalance.create({
         data: {
           currencyType,
           date: day,
@@ -108,84 +113,62 @@ export async function POST(req: NextRequest) {
           exchangeBuy: 0,
           exchangeSell: 0,
           sales: 0,
-          deposits: totalDeposits,
-          closingBalance: closing,
+          deposits: newTotalDeposits,
+          closingBalance: newClosingBalance,
         },
       });
-    } else {
-
-      // If row already exists, update closing
-      const preDepositClosing =
-        Number(daily.openingBalance ?? 0) +
-        Number(daily.purchases ?? 0) +
-        Number(daily.exchangeBuy ?? 0) -
-        Number(daily.exchangeSell ?? 0) -
-        Number(daily.sales ?? 0);
-
-      const newClosing = preDepositClosing - totalDeposits;
-
-      await prisma.dailyCurrencyBalance.update({
-        where: { id: daily.id },
-        data: {
-          deposits: totalDeposits,
-          closingBalance: newClosing,
-        },
-      });
-
-      daily = await prisma.dailyCurrencyBalance.findUnique({
-        where: { id: daily.id },
-      })!;
     }
 
-    // -----------------------------------------
-    // 5. FORWARD PROPAGATION
-    // -----------------------------------------
+    // Forward propagation - update all future days
     let currentDay = day;
-
-    if (!daily) {
-  return NextResponse.json(
-    { error: "Daily record not found" },
-    { status: 404 }
-  );
-}
-
-    let currentClosing = Number(daily.closingBalance ?? 0);
+    let currentClosing = newClosingBalance;
 
     while (true) {
       const nextDay = new Date(currentDay.getTime() + 86400000);
+      const nextDayDate = toDayDate(nextDay);
 
-      const next = await prisma.dailyCurrencyBalance.findUnique({
-        where: { currencyType_date: { currencyType, date: nextDay } },
+      const nextDayBalance = await prisma.dailyCurrencyBalance.findUnique({
+        where: { currencyType_date: { currencyType, date: nextDayDate } },
       });
 
-      if (!next) break; // Stop when there's no more future rows
+      if (!nextDayBalance) break;
 
       const nextOpening = currentClosing;
 
-      const nextPreDepositClosing =
+      const nextPreDepositBalance =
         nextOpening +
-        Number(next.purchases ?? 0) +
-        Number(next.exchangeBuy ?? 0) -
-        Number(next.exchangeSell ?? 0) -
-        Number(next.sales ?? 0);
+        Number(nextDayBalance.purchases ?? 0) +
+        Number(nextDayBalance.exchangeBuy ?? 0) -
+        Number(nextDayBalance.exchangeSell ?? 0) -
+        Number(nextDayBalance.sales ?? 0);
 
-      const nextClosing = nextPreDepositClosing - Number(next.deposits ?? 0);
+      const nextClosing =
+        nextPreDepositBalance - Number(nextDayBalance.deposits ?? 0);
 
       await prisma.dailyCurrencyBalance.update({
-        where: { id: next.id },
+        where: { id: nextDayBalance.id },
         data: {
           openingBalance: nextOpening,
           closingBalance: nextClosing,
         },
       });
 
-      currentDay = nextDay;
+      currentDay = nextDayDate;
       currentClosing = nextClosing;
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: "Deposit added successfully",
+      depositAmount: depositAmount.toFixed(2),
+      newTotalDeposits: newTotalDeposits.toFixed(2),
+      newClosingBalance: newClosingBalance.toFixed(2),
+    });
   } catch (err) {
     console.error("update-deposit error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

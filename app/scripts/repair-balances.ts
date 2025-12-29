@@ -1,7 +1,3 @@
-// scripts/repair-balances.ts
-// Run this script to recalculate all daily balances correctly
-// Usage: npx ts-node scripts/repair-balances.ts
-
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -20,7 +16,6 @@ async function repairBalances() {
   for (const currency of CURRENCIES) {
     console.log(`\n=== Processing ${currency} ===`);
 
-    // Get all daily balance records for this currency, ordered by date
     const records = await prisma.dailyCurrencyBalance.findMany({
       where: { currencyType: currency },
       orderBy: { date: "asc" },
@@ -43,10 +38,8 @@ async function repairBalances() {
 
       console.log(`\nProcessing ${currency} ${date.toISOString().split("T")[0]}`);
 
-      // 1. Opening balance = previous day's closing (or 0 for first day)
       const openingBalance = i === 0 ? 0 : previousClosing;
 
-      // 2. Recalculate purchases from receipts
       const purchasesAgg = await prisma.customerReceiptCurrency.aggregate({
         _sum: { amountFcy: true },
         where: {
@@ -62,7 +55,6 @@ async function repairBalances() {
 
       const purchases = Number(purchasesAgg._sum.amountFcy ?? 0);
 
-      // 3. Recalculate deposits from deposit records
       const depositsAgg = await prisma.depositRecord.aggregate({
         _sum: { amount: true },
         where: {
@@ -73,8 +65,6 @@ async function repairBalances() {
 
       const deposits = Number(depositsAgg._sum.amount ?? 0);
 
-      // 4. Calculate closing balance
-      // Formula: Opening + Purchases + ExchangeBuy - ExchangeSell - Sales - Deposits
       const exchangeBuy = Number(record.exchangeBuy ?? 0);
       const exchangeSell = Number(record.exchangeSell ?? 0);
       const sales = Number(record.sales ?? 0);
@@ -88,7 +78,6 @@ async function repairBalances() {
       console.log(`  Old Closing: ${Number(record.closingBalance).toFixed(2)}`);
       console.log(`  New Closing: ${closingBalance.toFixed(2)}`);
 
-      // 5. Update the record
       await prisma.dailyCurrencyBalance.update({
         where: { id: record.id },
         data: {
