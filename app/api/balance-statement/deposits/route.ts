@@ -1,6 +1,3 @@
-// ============================================================================
-// FILE 3: app/api/balance-statement/deposits/route.ts
-// ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
 import { toDayDate } from "@/app/libs/day";

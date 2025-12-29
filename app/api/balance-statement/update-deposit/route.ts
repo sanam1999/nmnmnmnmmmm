@@ -1,6 +1,3 @@
-// ============================================================================
-// FILE 2: app/api/balance-statement/update-deposit/route.ts
-// ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../libs/prisma";
 import { toDayDate } from "../../../libs/day";
@@ -22,7 +19,7 @@ export async function POST(req: NextRequest) {
     const dayEnd = new Date(day);
     dayEnd.setHours(23, 59, 59, 999);
 
-    // Get opening balance from MOST RECENT previous day
+    // Get opening balance from most recent previous day
     const prevDay = new Date(day.getTime() - 86400000);
     const prevDayDate = toDayDate(prevDay);
 
@@ -53,6 +50,15 @@ export async function POST(req: NextRequest) {
 
     const purchases = Number(purchasesAgg._sum.amountFcy ?? 0);
 
+    // Get existing daily record to retrieve exchange and sales values
+    const existingDaily = await prisma.dailyCurrencyBalance.findUnique({
+      where: { currencyType_date: { currencyType, date: day } },
+    });
+
+    const exchangeBuy = Number(existingDaily?.exchangeBuy ?? 0);
+    const exchangeSell = Number(existingDaily?.exchangeSell ?? 0);
+    const sales = Number(existingDaily?.sales ?? 0);
+
     // Get current total deposits for this day
     const currentDepositsAgg = await prisma.depositRecord.aggregate({
       _sum: { amount: true },
@@ -61,10 +67,17 @@ export async function POST(req: NextRequest) {
 
     const currentTotalDeposits = Number(currentDepositsAgg._sum.amount ?? 0);
 
-    // Validate deposit amount
-    const preDepositBalance = openingBalance + purchases;
+    // Calculate pre-deposit balance using complete formula
+    const preDepositBalance =
+      openingBalance +
+      purchases +
+      exchangeBuy -
+      exchangeSell -
+      sales;
+
     const availableBalance = preDepositBalance - currentTotalDeposits;
 
+    // Validate deposit amount
     if (depositAmount > availableBalance) {
       return NextResponse.json(
         {
@@ -89,11 +102,7 @@ export async function POST(req: NextRequest) {
     const newTotalDeposits = currentTotalDeposits + depositAmount;
     const newClosingBalance = preDepositBalance - newTotalDeposits;
 
-    // Update or create daily balance
-    const existingDaily = await prisma.dailyCurrencyBalance.findUnique({
-      where: { currencyType_date: { currencyType, date: day } },
-    });
-
+    // Update or create daily balance record
     if (existingDaily) {
       await prisma.dailyCurrencyBalance.update({
         where: { id: existingDaily.id },
@@ -135,15 +144,14 @@ export async function POST(req: NextRequest) {
 
       const nextOpening = currentClosing;
 
-      const nextPreDepositBalance =
+      // Calculate next day closing using complete formula
+      const nextClosing =
         nextOpening +
         Number(nextDayBalance.purchases ?? 0) +
         Number(nextDayBalance.exchangeBuy ?? 0) -
         Number(nextDayBalance.exchangeSell ?? 0) -
-        Number(nextDayBalance.sales ?? 0);
-
-      const nextClosing =
-        nextPreDepositBalance - Number(nextDayBalance.deposits ?? 0);
+        Number(nextDayBalance.sales ?? 0) -
+        Number(nextDayBalance.deposits ?? 0);
 
       await prisma.dailyCurrencyBalance.update({
         where: { id: nextDayBalance.id },
@@ -172,3 +180,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

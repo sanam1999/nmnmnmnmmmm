@@ -1,4 +1,3 @@
-//app/api/balance-statement/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../libs/prisma";
 import { toDayDate } from "../../libs/day";
@@ -63,6 +62,7 @@ export async function GET(req: NextRequest) {
     const prevDay = getPreviousDay(from);
 
     const processingPromises = CURRENCIES.map(async (currency) => {
+      // Get opening balance from previous day
       const previousBalance = await prisma.dailyCurrencyBalance.findFirst({
         where: {
           currencyType: currency,
@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
       const toEndOfDay = new Date(to);
       toEndOfDay.setHours(23, 59, 59, 999);
 
+      // Calculate total purchases for the period
       const purchasesAgg = await prisma.customerReceiptCurrency.aggregate({
         _sum: { amountFcy: true },
         where: {
@@ -94,6 +95,7 @@ export async function GET(req: NextRequest) {
 
       const totalPurchases = Number(purchasesAgg._sum.amountFcy ?? 0);
 
+      // Calculate total deposits for the period
       const depositsAgg = await prisma.depositRecord.aggregate({
         _sum: { amount: true },
         where: {
@@ -104,10 +106,12 @@ export async function GET(req: NextRequest) {
 
       const totalDeposits = Number(depositsAgg._sum.amount ?? 0);
 
+      // Exchange and sales (currently 0, but kept for future use)
       const totalExchangeBuy = 0;
       const totalExchangeSell = 0;
       const totalSales = 0;
 
+      // Calculate closing balance using complete formula
       const closingBalance =
         openingBalance +
         totalPurchases +
@@ -139,3 +143,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
